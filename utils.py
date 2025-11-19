@@ -1,70 +1,132 @@
-# 가상환경 활성화된 상태에서
-pip list | grep -E "Flask|SQLAlchemy|rapidfuzz|pandas"
-Flask            2.2.5
-Flask-SQLAlchemy 3.0.4
-pandas           2.1.1
-SQLAlchemy       1.4.54
-(venv) 11:58 ~/Distance-Learning-Committee-5 (main)$ "
-Flask            2.2.5
-Flask-SQLAlchemy 3.0.4
-pandas           2.1.1
-SQLAlchemy       1.4.54
-(venv) 11:58 ~/Distance-Learning-Committee-5 (main)$ 
-> 
-> # 프로젝트 루트에서 (venv 활성화된 상태)
-python -c "from app import create_app; app=create_app(); from models import db; with app.app_context(): db.create_all(); print('DB created')"
-bash: syntax error near unexpected token `('
-(venv) 12:00 ~/Distance-Learning-Committee-5 (main)$ python -c 'from app import create_app; app=create_app(); from models import db; with app.app_context(): db.create_all(); print("DB created")'
-  File "<string>", line 1
-    from app import create_app; app=create_app(); from models import db; with app.app_context(): db.create_all(); print("DB created")
-                                                                         ^^^^
-SyntaxError: invalid syntax
-(venv) 12:02 ~/Distance-Learning-Committee-5 (main)$ 
-(venv) 12:02 ~/Distance-Learning-Committee-5 (main)$ cat > create_db.py <<'PY'
-from app import create_app
-app = create_app()
-from models import db
-with app.app_context():
-    db.create_all()
-print("DB created")
-PY
-python create_db.py
-# 필요하면 삭제
-rm create_db.py
-Traceback (most recent call last):
-  File "/home/Learninginnovation/Distance-Learning-Committee-5/create_db.py", line 1, in <module>
-    from app import create_app
-  File "/home/Learninginnovation/Distance-Learning-Committee-5/app.py", line 4, in <module>
-    from utils import enrich_faculty_excel, normalize_name, fuzzy_search_name, format_modified_date, import_course_excel
-  File "/home/Learninginnovation/Distance-Learning-Committee-5/utils.py", line 45
-    out_rows.append({
-                    ^
-SyntaxError: '{' was never closed
-(venv) 12:02 ~/Distance-Learning-Committee-5 (main)$ 
-(venv) 12:03 ~/Distance-Learning-Committee-5 (main)$ pwd
-ls -la
-/home/Learninginnovation/Distance-Learning-Committee-5
-total 68
-drwxrwxr-x 7 Learninginnovation registered_users  4096 Nov 19 12:02 .
-drwxrwxr-x 7 Learninginnovation registered_users  4096 Nov 19 11:35 ..
-drwxrwxr-x 8 Learninginnovation registered_users  4096 Nov 19 11:35 .git
--rw-rw-r-- 1 Learninginnovation registered_users   154 Nov 19 11:35 .gitignore
--rw-rw-r-- 1 Learninginnovation registered_users  2981 Nov 19 11:35 README.md
-drwxrwxr-x 2 Learninginnovation registered_users  4096 Nov 19 12:02 __pycache__
--rw-rw-r-- 1 Learninginnovation registered_users 11502 Nov 19 11:35 app.py
--rw-rw-r-- 1 Learninginnovation registered_users   504 Nov 19 11:35 config.py
--rw-rw-r-- 1 Learninginnovation registered_users  2229 Nov 19 11:35 models.py
--rw-rw-r-- 1 Learninginnovation registered_users   158 Nov 19 11:51 requirements.txt
--rw-rw-r-- 1 Learninginnovation registered_users   105 Nov 19 11:35 run.sh
-drwxrwxr-x 3 Learninginnovation registered_users  4096 Nov 19 11:35 static
-drwxrwxr-x 2 Learninginnovation registered_users  4096 Nov 19 11:35 templates
--rw-rw-r-- 1 Learninginnovation registered_users  1867 Nov 19 11:35 utils.py
-drwxrwxr-x 5 Learninginnovation registered_users  4096 Nov 19 11:47 venv
-(venv) 12:03 ~/Distance-Learning-Committee-5 (main)$ 
-(venv) 12:03 ~/Distance-Learning-Committee-5 (main)$ which python
-echo $VIRTUAL_ENV
-python -V
-/home/Learninginnovation/Distance-Learning-Committee-5/venv/bin/python
-/home/Learninginnovation/Distance-Learning-Committee-5/venv
-Python 3.10.12
-(venv) 12:03 ~/Distance-Learning-Committee-5 (main)$ 
+import io
+from datetime import datetime, timezone
+import pandas as pd
+from rapidfuzz import process, fuzz
+from models import Faculty
+from werkzeug.datastructures import FileStorage
+
+# 정규화 헬퍼
+def normalize_name(s: str) -> str:
+    if not s:
+        return ""
+    s = str(s).strip()
+    s = " ".join(s.split())  # 연속 공백 정리
+    return s
+
+# 엑셀 업로드(faculty) -> 내부 DB랑 완전 일치 매칭 후 채우기. 반환: BytesIO(엑셀)
+def enrich_faculty_excel(file_storage: FileStorage, db_session) -> io.BytesIO:
+    df = pd.read_excel(file_storage, engine="openpyxl")
+    # 기대 컬럼: Korean_name (대소문자/스페이스 normalize 필요)
+    if "Korean_name" not in df.columns and "korean_name" not in df.columns:
+        # 시도: 첫번째 열을 Korean_name으로 간주
+        df.columns = [c if i != 0 else "Korean_name" for i, c in enumerate(df.columns)]
+    # ensure column
+    df.rename(columns={col: ("Korean_name" if col.lower()=="korean_name" else col) for col in df.columns}, inplace=True)
+    # 준비된 결과 컬럼
+    out_cols = ["No", "Korean_name", "English_name", "Category", "Email"]
+    out_rows = []
+    faculties = {normalize_name(f.korean_name): f for f in db_session.query(Faculty).all()}
+    for idx, row in df.iterrows():
+        kname = normalize_name(row.get("Korean_name", ""))
+        if not kname:
+            english = ""
+            category = ""
+            email = ""
+        else:
+            f = faculties.get(kname)
+            if f:
+                english = f.english_name or ""
+                category = f.category or ""
+                email = f.email or ""
+            else:
+                english = ""
+                category = ""
+                email = ""
+        out_rows.append({
+            "No": idx+1,
+            "Korean_name": kname,
+            "English_name": english,
+            "Category": category,
+            "Email": email
+        })
+    out_df = pd.DataFrame(out_rows, columns=out_cols)
+    bio = io.BytesIO()
+    out_df.to_excel(bio, index=False, engine="openpyxl")
+    bio.seek(0)
+    return bio
+
+# 퍼지 검색 후보(rapidfuzz 사용)
+def fuzzy_search_name(query: str, candidates: list, limit: int = 10):
+    # candidates: list of strings
+    if not query:
+        return []
+    results = process.extract(query, candidates, scorer=fuzz.WRatio, limit=limit)
+    # results: list of tuples (candidate, score, index)
+    return results
+
+# Modified Date formatting (UI용)
+def format_modified_date(dt):
+    if not dt:
+        return ""
+    # Return localized string like "2025-07-15 10:29:16 AM"
+    # Here we assume dt is UTC; front-end can convert if needed. We'll format in server local time for display.
+    local = dt.astimezone() if dt.tzinfo else dt
+    return local.strftime("%Y-%m-%d %I:%M:%S %p")
+
+# Helper to parse course excel and merge into DB by Korean name
+def import_course_excel(file_storage, db_session, CourseModality):
+    df = pd.read_excel(file_storage, engine="openpyxl")
+    # expected columns include Korean_name or Name
+    name_col = None
+    for c in df.columns:
+        if c.lower() in ("korean_name", "name", "instructor", "instructor_name"):
+            name_col = c
+            break
+    if not name_col:
+        # try first column
+        name_col = df.columns[0]
+    # For each row, normalize name, find existing by exact match on name, update or insert
+    updated = 0
+    inserted = 0
+    for _, row in df.iterrows():
+        raw_name = normalize_name(row.get(name_col, ""))
+        if not raw_name:
+            continue
+        existing = db_session.query(CourseModality).filter_by(name=raw_name).first()
+        if existing:
+            # update known columns if present
+            existing.year = int(row.get("Year")) if pd.notna(row.get("Year")) else existing.year
+            existing.semester = row.get("Semester") or existing.semester
+            existing.language = row.get("Language") or existing.language
+            existing.course_title = row.get("Course Title") or existing.course_title
+            existing.time_slot = row.get("Time Slot") or existing.time_slot
+            existing.day = row.get("Day") or existing.day
+            existing.time = row.get("Time") or existing.time
+            existing.frequency_week = row.get("Frequency(Week)") or existing.frequency_week
+            existing.course_format = row.get("Course format") or existing.course_format
+            # password column might exist in excel
+            pw = row.get("password")
+            if pd.notna(pw):
+                existing.set_pin(str(pw))
+            db_session.add(existing)
+            updated += 1
+        else:
+            cm = CourseModality(
+                name=raw_name,
+                year=int(row.get("Year")) if pd.notna(row.get("Year")) else None,
+                semester=row.get("Semester"),
+                language=row.get("Language"),
+                course_title=row.get("Course Title"),
+                time_slot=row.get("Time Slot"),
+                day=row.get("Day"),
+                time=row.get("Time"),
+                frequency_week=row.get("Frequency(Week)"),
+                course_format=row.get("Course format")
+            )
+            pw = row.get("password")
+            if pd.notna(pw):
+                cm.set_pin(str(pw))
+            db_session.add(cm)
+            inserted += 1
+    db_session.commit()
+    return {"updated": updated, "inserted": inserted}
