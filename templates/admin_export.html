@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Admin Export (Course DB)</h2>
+  <form method="post">
+    <div class="mb-3">
+      <label>Admin PIN:</label>
+      <input type="password" name="admin_pin" class="form-control" required />
+    </div>
+    <button class="btn btn-primary">Download Excel</button>
+  </form>
+{% endblock %}
