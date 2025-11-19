@@ -79,7 +79,7 @@ def import_course_excel(file_storage, db_session, CourseModality):
     # expected columns include Korean_name or Name
     name_col = None
     for c in df.columns:
-        if c.lower() in ("korean_name", "name", "instructor", "instructor_name"):
+        if c.lower() in ("Korean_name", "English_name"):
             name_col = c
             break
     if not name_col:
