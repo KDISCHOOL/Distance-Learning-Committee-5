@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Course Modality DB</h2>
+  <form method="get" action="{{ url_for('course_search') }}" class="mb-3">
+    <input type="text" name="q" value="{{ query }}" placeholder="Enter Korean or English name" class="form-control" />
+    <button class="btn btn-primary mt-2">Search</button>
+  </form>
+
+  {% if results %}
+    <h3>Results</h3>
+    <table class="table">
+      <thead><tr><th>No</th><th>Name</th><th>Year</th><th>Semester</th><th>Course Title</th><th>Apply</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for c in results %}
+        <tr>
+          <td>{{ c.no }}</td>
+          <td>{{ c.name }}</td>
+          <td>{{ c.year }}</td>
+          <td>{{ c.semester }}</td>
+          <td>{{ c.course_title }}</td>
+          <td>{{ "Yes" if c.apply_flag else "No" }}</td>
+          <td>
+            <!-- Apply button triggers pin+reason modal in full app; here link to sample -->
+            <form action="{{ url_for('course_apply', course_id=c.id) }}" method="post" style="display:inline;">
+              <input type="hidden" name="pin" value="" />
+              <button class="btn btn-sm btn-success">Apply</button>
+            </form>
+            <form action="{{ url_for('course_lookup', course_id=c.id) }}" method="post" style="display:inline;">
+              <input type="hidden" name="pin" value="" />
+              <button class="btn btn-sm btn-secondary">Look up</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}
