@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Faculty Email Finder</h2>
+  <form method="get" action="{{ url_for('faculty_search') }}" class="mb-3">
+    <input type="text" name="q" value="{{ query }}" placeholder="Enter Korean name" class="form-control" />
+    <button class="btn btn-primary mt-2">Search</button>
+  </form>
+  {% if results %}
+    <h3>Results</h3>
+    <table class="table">
+      <thead><tr><th>Korean</th><th>English</th><th>Category</th><th>Email</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for r in results %}
+        <tr>
+          <td>{{ r.Korean_name }}</td>
+          <td>{{ r.English_name }}</td>
+          <td>{{ r.Category }}</td>
+          <td><input type="text" value="{{ r.Email }}" readonly class="form-control" id="email-{{ loop.index }}" /> </td>
+          <td><button class="btn btn-sm btn-outline-secondary" onclick="copyEmail('email-{{ loop.index }}')">Copy Email</button></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}
