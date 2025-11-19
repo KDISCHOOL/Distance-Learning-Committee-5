@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.env
+venv/
+env/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+
+# Database
+dlc.db
+
+# Mac
+.DS_Store
+
+# Excel / uploads
+*.xlsx
+*.xls
