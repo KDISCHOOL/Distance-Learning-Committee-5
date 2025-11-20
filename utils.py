@@ -21,7 +21,7 @@ def enrich_faculty_excel(file_storage: FileStorage, db_session) -> io.BytesIO:
         # 시도: 첫번째 열을 Korean_name으로 간주
         df.columns = [c if i != 0 else "Korean_name" for i, c in enumerate(df.columns)]
     # ensure column
-    df.rename(columns={col: ("Korean_name" if col.lower()=="korean_name" else col) for col in df.columns}, inplace=True)
+    df.rename(columns={col: ("Korean_name" if col.lower() == "korean_name" else col) for col in df.columns}, inplace=True)
     # 준비된 결과 컬럼
     out_cols = ["No", "Korean_name", "English_name", "Category", "Email"]
     out_rows = []
@@ -43,7 +43,7 @@ def enrich_faculty_excel(file_storage: FileStorage, db_session) -> io.BytesIO:
                 category = ""
                 email = ""
         out_rows.append({
-            "No": idx+1,
+            "No": idx + 1,
             "Korean_name": kname,
             "English_name": english,
             "Category": category,
@@ -79,7 +79,7 @@ def import_course_excel(file_storage, db_session, CourseModality):
     # expected columns include Korean_name or Name
     name_col = None
     for c in df.columns:
-        if c.lower() in ("Korean_name", "English_name"):
+        if c.lower() in ("korean_name", "name", "instructor", "instructor_name"):
             name_col = c
             break
     if not name_col:
